@@ -290,6 +290,122 @@ router.get('/check-eligibility', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/travel-buddy/platform-stats - Get platform statistics for access page
+router.get('/platform-stats', async (req, res) => {
+  try {
+    // Get active travel buddies with non-expired ads
+    const activeBuddies = await TravelBuddy.aggregate([
+      {
+        $lookup: {
+          from: 'advertisements',
+          localField: 'publishedAdId',
+          foreignField: '_id',
+          as: 'advertisement'
+        }
+      },
+      {
+        $unwind: {
+          path: '$advertisement',
+          preserveNullAndEmptyArrays: false
+        }
+      },
+      {
+        $match: {
+          isActive: true,
+          'advertisement.status': { $in: ['active', 'Published'] }
+        }
+      }
+    ]);
+
+    // Count by gender
+    const maleBuddiesCount = activeBuddies.filter(b => b.gender === 'Male').length;
+    const femaleBuddiesCount = activeBuddies.filter(b => b.gender === 'Female').length;
+    const otherBuddiesCount = activeBuddies.filter(b => b.gender !== 'Male' && b.gender !== 'Female').length;
+
+    // Get trip requests count
+    const TripRequest = require('../models/TripRequest');
+    const tripRequestsCount = await TripRequest.countDocuments({ isActive: true });
+
+    // Get top-rated active travel buddies (sorted by rating, limit to 6)
+    const topRatedBuddies = await TravelBuddy.aggregate([
+      {
+        $lookup: {
+          from: 'advertisements',
+          localField: 'publishedAdId',
+          foreignField: '_id',
+          as: 'advertisement'
+        }
+      },
+      {
+        $unwind: {
+          path: '$advertisement',
+          preserveNullAndEmptyArrays: false
+        }
+      },
+      {
+        $match: {
+          isActive: true,
+          'advertisement.status': { $in: ['active', 'Published'] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $unwind: {
+          path: '$user',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $sort: { averageRating: -1, totalReviews: -1, publishedAt: -1 }
+      },
+      {
+        $limit: 6
+      },
+      {
+        $project: {
+          _id: 1,
+          userName: 1,
+          avatarImage: 1,
+          averageRating: 1,
+          totalReviews: 1,
+          country: 1,
+          gender: 1,
+          'user.isMember': 1,
+          'user.isPartner': 1
+        }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        statistics: {
+          maleBuddies: maleBuddiesCount,
+          femaleBuddies: femaleBuddiesCount,
+          otherBuddies: otherBuddiesCount,
+          totalBuddies: activeBuddies.length,
+          tripRequests: tripRequestsCount
+        },
+        topRatedProfiles: topRatedBuddies
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching platform statistics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch platform statistics'
+    });
+  }
+});
+
 // GET /api/travel-buddy/platform - Get all active travel buddies for the platform (excluding expired ads)
 router.get('/platform', async (req, res) => {
   try {
