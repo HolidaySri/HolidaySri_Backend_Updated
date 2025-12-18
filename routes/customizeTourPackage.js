@@ -6,7 +6,13 @@ const User = require('../models/User');
 const { HSCConfig } = require('../models/HSC');
 const { CommercialPartner } = require('../models/CommercialPartner');
 const { verifyToken, verifyEmailVerified, verifyAdminToken } = require('../middleware/auth');
-const { sendCustomizeTourPartnerNotification, sendTourPackageApprovalConfirmation } = require('../utils/emailService');
+const {
+  sendCustomizeTourPartnerNotification,
+  sendTourPackageApprovalConfirmation,
+  sendProposalReceivedNotification,
+  sendProposalAcceptedNotification,
+  sendProposalRejectedNotification
+} = require('../utils/emailService');
 
 // Submit customize tour package request
 router.post('/submit', verifyToken, verifyEmailVerified, async (req, res) => {
@@ -389,13 +395,17 @@ router.get('/partner/requests', verifyToken, verifyEmailVerified, async (req, re
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    // Get requests with status 'show-partners'
-    const requests = await CustomizeTourPackage.find({ status: 'show-partners' })
+    // Get requests with status 'show-partners' (exclude accepted proposals)
+    const requests = await CustomizeTourPackage.find({
+      status: 'show-partners'
+    })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    const total = await CustomizeTourPackage.countDocuments({ status: 'show-partners' });
+    const total = await CustomizeTourPackage.countDocuments({
+      status: 'show-partners'
+    });
 
     res.json({
       success: true,
@@ -423,7 +433,9 @@ router.get('/partner/requests/count', verifyToken, verifyEmailVerified, async (r
       return res.status(403).json({ message: 'Access denied. Active commercial partnership required.' });
     }
 
-    const count = await CustomizeTourPackage.countDocuments({ status: 'show-partners' });
+    const count = await CustomizeTourPackage.countDocuments({
+      status: 'show-partners'
+    });
 
     res.json({
       success: true,
@@ -494,6 +506,199 @@ router.put('/partner/request/:id/approve', verifyToken, verifyEmailVerified, asy
 
   } catch (error) {
     console.error('Partner approve request error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Send proposal for a request (Partner)
+router.post('/partner/request/:id/send-proposal', verifyToken, verifyEmailVerified, async (req, res) => {
+  try {
+    // Check if user is a partner
+    const user = await User.findById(req.user._id);
+    if (!user.isPartner || !user.partnerExpirationDate || new Date(user.partnerExpirationDate) < new Date()) {
+      return res.status(403).json({ message: 'Access denied. Active commercial partnership required.' });
+    }
+
+    const { proposalPDF } = req.body;
+
+    if (!proposalPDF || !proposalPDF.url || !proposalPDF.publicId) {
+      return res.status(400).json({ message: 'Proposal PDF is required' });
+    }
+
+    const request = await CustomizeTourPackage.findById(req.params.id).populate('userId', 'name email');
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    if (request.status !== 'show-partners') {
+      return res.status(400).json({ message: 'This request is not available for proposals' });
+    }
+
+    // Check if partner already submitted a proposal
+    const existingProposal = request.proposals.find(
+      p => p.partnerId.toString() === req.user._id.toString()
+    );
+
+    if (existingProposal) {
+      return res.status(400).json({ message: 'You have already submitted a proposal for this request' });
+    }
+
+    // Add proposal to request
+    request.proposals.push({
+      partnerId: req.user._id,
+      partnerName: user.name,
+      partnerEmail: user.email,
+      proposalPDF: {
+        url: proposalPDF.url,
+        publicId: proposalPDF.publicId
+      },
+      status: 'pending'
+    });
+
+    await request.save();
+
+    // Send email notification to client
+    try {
+      await sendProposalReceivedNotification(
+        request.email,
+        request.fullName,
+        {
+          numberOfTravelers: request.numberOfTravelers,
+          duration: request.duration,
+          startDate: request.startDate,
+          accommodation: request.accommodation
+        },
+        user.name
+      );
+    } catch (emailError) {
+      console.error('Error sending proposal received email:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    res.json({
+      success: true,
+      message: 'Proposal submitted successfully. Client will be notified.',
+      data: request
+    });
+
+  } catch (error) {
+    console.error('Send proposal error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get proposals for a request (Client)
+router.get('/request/:id/proposals', verifyToken, verifyEmailVerified, async (req, res) => {
+  try {
+    const request = await CustomizeTourPackage.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    }).populate('proposals.partnerId', 'name email');
+
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    res.json({
+      success: true,
+      data: request.proposals
+    });
+
+  } catch (error) {
+    console.error('Get proposals error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Accept a proposal (Client)
+router.put('/request/:requestId/proposal/:proposalId/accept', verifyToken, verifyEmailVerified, async (req, res) => {
+  try {
+    const request = await CustomizeTourPackage.findOne({
+      _id: req.params.requestId,
+      userId: req.user._id
+    });
+
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    const proposal = request.proposals.id(req.params.proposalId);
+    if (!proposal) {
+      return res.status(404).json({ message: 'Proposal not found' });
+    }
+
+    if (proposal.status !== 'pending') {
+      return res.status(400).json({ message: 'This proposal has already been processed' });
+    }
+
+    // Update proposal statuses
+    request.proposals.forEach(p => {
+      if (p._id.toString() === req.params.proposalId) {
+        p.status = 'accepted';
+      } else if (p.status === 'pending') {
+        p.status = 'rejected';
+      }
+    });
+
+    request.acceptedProposalId = req.params.proposalId;
+    request.acceptedAt = new Date();
+    request.status = 'proposal-accepted';
+
+    await request.save();
+
+    // Send emails to all partners
+    const emailPromises = [];
+
+    for (const p of request.proposals) {
+      const partner = await User.findById(p.partnerId);
+      if (!partner) continue;
+
+      if (p.status === 'accepted') {
+        // Send acceptance email with client details
+        emailPromises.push(
+          sendProposalAcceptedNotification(
+            partner.email,
+            partner.name,
+            {
+              numberOfTravelers: request.numberOfTravelers,
+              duration: request.duration,
+              startDate: request.startDate,
+              accommodation: request.accommodation,
+              specialRequests: request.specialRequests
+            },
+            {
+              fullName: request.fullName,
+              email: request.email,
+              contactNumber: request.contactNumber
+            }
+          )
+        );
+      } else if (p.status === 'rejected') {
+        // Send rejection email
+        emailPromises.push(
+          sendProposalRejectedNotification(
+            partner.email,
+            partner.name,
+            {
+              numberOfTravelers: request.numberOfTravelers,
+              duration: request.duration,
+              startDate: request.startDate
+            }
+          )
+        );
+      }
+    }
+
+    await Promise.allSettled(emailPromises);
+
+    res.json({
+      success: true,
+      message: 'Proposal accepted successfully. Notifications sent to all partners.',
+      data: request
+    });
+
+  } catch (error) {
+    console.error('Accept proposal error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

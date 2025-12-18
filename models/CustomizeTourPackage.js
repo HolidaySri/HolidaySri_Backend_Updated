@@ -68,7 +68,7 @@ const customizeTourPackageSchema = new mongoose.Schema({
   // Request Status
   status: {
     type: String,
-    enum: ['pending', 'under-review', 'approved', 'rejected', 'show-partners', 'partner-approved'],
+    enum: ['pending', 'under-review', 'approved', 'rejected', 'show-partners', 'partner-approved', 'proposal-accepted'],
     default: 'pending'
   },
 
@@ -84,7 +84,51 @@ const customizeTourPackageSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  
+
+  // Proposals from Partners
+  proposals: [{
+    partnerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    partnerName: {
+      type: String,
+      required: true
+    },
+    partnerEmail: {
+      type: String,
+      required: true
+    },
+    proposalPDF: {
+      url: {
+        type: String,
+        required: true
+      },
+      publicId: {
+        type: String,
+        required: true
+      }
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'accepted', 'rejected'],
+      default: 'pending'
+    },
+    submittedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+
+  // Accepted Proposal Information
+  acceptedProposalId: {
+    type: mongoose.Schema.Types.ObjectId
+  },
+  acceptedAt: {
+    type: Date
+  },
+
   // HSC Charge Information
   hscCharge: {
     type: Number,

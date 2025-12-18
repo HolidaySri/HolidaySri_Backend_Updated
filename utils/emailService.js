@@ -3235,6 +3235,214 @@ const sendVerificationRejectionNotification = async (email, name, reason) => {
   }
 };
 
+// Send proposal received notification to client
+const sendProposalReceivedNotification = async (email, name, requestDetails, partnerName) => {
+  const transporter = createTransporter();
+
+  const mailOptions = {
+    from: {
+      name: 'Holidaysri.com',
+      address: process.env.EMAIL_USER
+    },
+    to: email,
+    subject: '📬 New Proposal Received for Your Tour Package Request',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">📬 New Proposal Received!</h1>
+        </div>
+
+        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <p style="color: #333; font-size: 16px; line-height: 1.6;">
+            Hello <strong>${name}</strong>,
+          </p>
+
+          <p style="color: #333; font-size: 16px; line-height: 1.6;">
+            Great news! <strong>${partnerName}</strong> has submitted a proposal for your customize tour package request.
+          </p>
+
+          <div style="background-color: #fff7ed; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f97316;">
+            <h3 style="color: #ea580c; margin: 0 0 15px 0; font-size: 18px;">📋 Your Request Details:</h3>
+            <p style="color: #555; margin: 5px 0;"><strong>Travelers:</strong> ${requestDetails.numberOfTravelers}</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Duration:</strong> ${requestDetails.duration} days</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Start Date:</strong> ${new Date(requestDetails.startDate).toLocaleDateString()}</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Accommodation:</strong> ${requestDetails.accommodation}</p>
+          </div>
+
+          <div style="background-color: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="color: #166534; margin: 0; font-size: 14px; line-height: 1.6;">
+              <strong>✨ What's Next?</strong><br>
+              Log in to your account and navigate to the <strong>My Requests</strong> tab to view the proposal, compare it with other proposals, and accept the one that best suits your needs.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://www.holidaysri.com/customize-tour-package" style="display: inline-block; background: linear-gradient(135deg, #f97316, #fb923c); color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+              View Proposals
+            </a>
+          </div>
+
+          <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center;">
+            <p style="color: #888; font-size: 14px; margin: 0;">
+              © 2024 Holidaysri.com. All rights reserved.
+            </p>
+            <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
+              This is an automated message, please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Proposal received notification email sending error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send proposal accepted notification to partner
+const sendProposalAcceptedNotification = async (email, name, requestDetails, clientDetails) => {
+  const transporter = createTransporter();
+
+  const mailOptions = {
+    from: {
+      name: 'Holidaysri.com',
+      address: process.env.EMAIL_USER
+    },
+    to: email,
+    subject: '🎉 Congratulations! Your Proposal Has Been Accepted',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Proposal Accepted!</h1>
+        </div>
+
+        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <p style="color: #333; font-size: 16px; line-height: 1.6;">
+            Hello <strong>${name}</strong>,
+          </p>
+
+          <p style="color: #333; font-size: 16px; line-height: 1.6;">
+            Congratulations! Your proposal for the customize tour package request has been <strong>accepted</strong> by the client.
+          </p>
+
+          <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+            <h3 style="color: #047857; margin: 0 0 15px 0; font-size: 18px;">👤 Client Contact Details:</h3>
+            <p style="color: #555; margin: 5px 0;"><strong>Name:</strong> ${clientDetails.fullName}</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Email:</strong> ${clientDetails.email}</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Contact:</strong> ${clientDetails.contactNumber}</p>
+          </div>
+
+          <div style="background-color: #fff7ed; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #ea580c; margin: 0 0 15px 0; font-size: 18px;">📋 Tour Details:</h3>
+            <p style="color: #555; margin: 5px 0;"><strong>Travelers:</strong> ${requestDetails.numberOfTravelers}</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Duration:</strong> ${requestDetails.duration} days</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Start Date:</strong> ${new Date(requestDetails.startDate).toLocaleDateString()}</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Accommodation:</strong> ${requestDetails.accommodation}</p>
+            ${requestDetails.specialRequests ? `<p style="color: #555; margin: 5px 0;"><strong>Special Requests:</strong> ${requestDetails.specialRequests}</p>` : ''}
+          </div>
+
+          <div style="background-color: #dbeafe; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="color: #1e40af; margin: 0; font-size: 14px; line-height: 1.6;">
+              <strong>📞 Next Steps:</strong><br>
+              Please contact the client directly using the contact details provided above to finalize the tour arrangements and discuss further details.
+            </p>
+          </div>
+
+          <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center;">
+            <p style="color: #888; font-size: 14px; margin: 0;">
+              © 2024 Holidaysri.com. All rights reserved.
+            </p>
+            <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
+              This is an automated message, please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Proposal accepted notification email sending error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send proposal rejected notification to partner
+const sendProposalRejectedNotification = async (email, name, requestDetails) => {
+  const transporter = createTransporter();
+
+  const mailOptions = {
+    from: {
+      name: 'Holidaysri.com',
+      address: process.env.EMAIL_USER
+    },
+    to: email,
+    subject: 'Update on Your Tour Package Proposal',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">📋 Proposal Update</h1>
+        </div>
+
+        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <p style="color: #333; font-size: 16px; line-height: 1.6;">
+            Hello <strong>${name}</strong>,
+          </p>
+
+          <p style="color: #333; font-size: 16px; line-height: 1.6;">
+            Thank you for submitting your proposal for the customize tour package request. We regret to inform you that the client has selected another proposal for this request.
+          </p>
+
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #6b7280;">
+            <h3 style="color: #374151; margin: 0 0 15px 0; font-size: 18px;">📋 Request Details:</h3>
+            <p style="color: #555; margin: 5px 0;"><strong>Travelers:</strong> ${requestDetails.numberOfTravelers}</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Duration:</strong> ${requestDetails.duration} days</p>
+            <p style="color: #555; margin: 5px 0;"><strong>Start Date:</strong> ${new Date(requestDetails.startDate).toLocaleDateString()}</p>
+          </div>
+
+          <div style="background-color: #dbeafe; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="color: #1e40af; margin: 0; font-size: 14px; line-height: 1.6;">
+              <strong>💡 Don't be discouraged!</strong><br>
+              More customize tour package requests are coming in regularly. Keep an eye on the Partner Requests tab for new opportunities to showcase your services.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://www.holidaysri.com/customize-tour-package" style="display: inline-block; background: linear-gradient(135deg, #f97316, #fb923c); color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+              View New Requests
+            </a>
+          </div>
+
+          <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center;">
+            <p style="color: #888; font-size: 14px; margin: 0;">
+              © 2024 Holidaysri.com. All rights reserved.
+            </p>
+            <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
+              This is an automated message, please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Proposal rejected notification email sending error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   generateOTP,
   sendEmailVerificationOTP,
@@ -3268,5 +3476,8 @@ module.exports = {
   sendContactFormEmail,
   sendAdvertisementDeletionNotification,
   sendPhotoPostDeletionNotification,
-  sendVerificationRejectionNotification
+  sendVerificationRejectionNotification,
+  sendProposalReceivedNotification,
+  sendProposalAcceptedNotification,
+  sendProposalRejectedNotification
 };
