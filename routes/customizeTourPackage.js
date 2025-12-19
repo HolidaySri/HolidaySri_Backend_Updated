@@ -644,6 +644,13 @@ router.put('/request/:requestId/proposal/:proposalId/accept', verifyToken, verif
     request.acceptedAt = new Date();
     request.status = 'proposal-accepted';
 
+    // Get accepted partner details and update admin note
+    const acceptedPartner = await User.findById(proposal.partnerId);
+    if (acceptedPartner) {
+      const partnerNote = `\n\n[Proposal Accepted]\nAccepted Partner: ${acceptedPartner.name}\nPartner Email: ${acceptedPartner.email}\nPartner Contact: ${acceptedPartner.contactNumber}\nAccepted At: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Colombo' })}`;
+      request.adminNote = (request.adminNote || '') + partnerNote;
+    }
+
     await request.save();
 
     // Send emails to all partners
