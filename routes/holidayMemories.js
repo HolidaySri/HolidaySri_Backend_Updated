@@ -666,6 +666,52 @@ router.get('/user/my-posts', verifyToken, verifyEmailVerified, async (req, res) 
   }
 });
 
+// GET /api/holiday-memories/user/posts/:userId - Get posts by specific user ID (public)
+router.get('/user/posts/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { page = 1, limit = 12 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const posts = await HolidayMemory.find({
+      userId: userId,
+      isActive: true
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('userId', 'name email profileImage');
+
+    const total = await HolidayMemory.countDocuments({
+      userId: userId,
+      isActive: true
+    });
+
+    const transformedPosts = posts.map(post => ({
+      ...post.toObject(),
+      likeCount: post.likes.length,
+      commentCount: post.comments.length,
+      saveCount: post.saves.length,
+      downloadCount: post.downloads.length
+    }));
+
+    res.json({
+      success: true,
+      posts: transformedPosts,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / limit),
+        totalPosts: total,
+        hasMore: skip + posts.length < total
+      }
+    });
+
+  } catch (error) {
+    console.error('Get user posts error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // PUT /api/holiday-memories/:id - Update a post (owner only)
 router.put('/:id', verifyToken, verifyEmailVerified, async (req, res) => {
   try {
