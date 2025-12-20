@@ -5,7 +5,13 @@ const PaymentActivity = require('../models/PaymentActivity');
 const User = require('../models/User');
 const { HSCConfig, HSCTransaction } = require('../models/HSC');
 const { verifyToken, verifyEmailVerified, verifyAdminToken } = require('../middleware/auth');
-const { sendCustomizeEventPartnerNotification, sendEventRequestApprovalConfirmation } = require('../utils/emailService');
+const {
+  sendCustomizeEventPartnerNotification,
+  sendEventRequestApprovalConfirmation,
+  sendEventProposalReceivedNotification,
+  sendEventProposalAcceptedNotification,
+  sendEventProposalRejectedNotification
+} = require('../utils/emailService');
 
 // Submit customize event request
 router.post('/submit', verifyToken, verifyEmailVerified, async (req, res) => {
@@ -541,6 +547,228 @@ router.put('/admin/request/:id/show-partners', verifyAdminToken, async (req, res
 
   } catch (error) {
     console.error('Admin show partners error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Send proposal for a request (Partner/Member)
+router.post('/partner/request/:id/send-proposal', verifyToken, verifyEmailVerified, async (req, res) => {
+  try {
+    // Check if user is a partner or member
+    const user = await User.findById(req.user._id);
+
+    const isValidPartner = user.isPartner &&
+      user.partnerExpirationDate &&
+      new Date(user.partnerExpirationDate) > new Date();
+
+    const isValidMember = user.isMember &&
+      user.membershipExpirationDate &&
+      new Date(user.membershipExpirationDate) > new Date();
+
+    if (!isValidPartner && !isValidMember) {
+      return res.status(403).json({ message: 'Access denied. Active partnership or membership required.' });
+    }
+
+    const { proposalPDF } = req.body;
+
+    if (!proposalPDF || !proposalPDF.url || !proposalPDF.publicId) {
+      return res.status(400).json({ message: 'Proposal PDF is required' });
+    }
+
+    const request = await CustomizeEventRequest.findById(req.params.id).populate('userId', 'name email');
+
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    if (request.status !== 'show-partners-members') {
+      return res.status(400).json({ message: 'This request is not open for proposals' });
+    }
+
+    // Check if user already submitted a proposal
+    const existingProposal = request.proposals.find(
+      p => p.partnerId.toString() === user._id.toString()
+    );
+
+    if (existingProposal) {
+      return res.status(400).json({ message: 'You have already submitted a proposal for this request' });
+    }
+
+    // Add proposal to request
+    request.proposals.push({
+      partnerId: user._id,
+      partnerName: user.name,
+      partnerEmail: user.email,
+      partnerContactNumber: user.contactNumber,
+      proposalPDF: {
+        url: proposalPDF.url,
+        publicId: proposalPDF.publicId
+      },
+      status: 'pending',
+      submittedAt: new Date()
+    });
+
+    await request.save();
+
+    // Send email notification to client
+    try {
+      await sendEventProposalReceivedNotification(
+        request.email,
+        request.fullName,
+        {
+          eventType: request.eventType,
+          eventTypeOther: request.eventTypeOther,
+          numberOfGuests: request.numberOfGuests,
+          estimatedBudget: request.estimatedBudget
+        },
+        user.name
+      );
+    } catch (emailError) {
+      console.error('Error sending proposal received email:', emailError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Proposal submitted successfully',
+      data: request
+    });
+
+  } catch (error) {
+    console.error('Send proposal error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get proposals for a request (Client)
+router.get('/request/:id/proposals', verifyToken, verifyEmailVerified, async (req, res) => {
+  try {
+    const request = await CustomizeEventRequest.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    }).populate('proposals.partnerId', 'name email contactNumber');
+
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    res.json({
+      success: true,
+      data: request.proposals
+    });
+
+  } catch (error) {
+    console.error('Get proposals error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Accept a proposal (Client)
+router.put('/request/:requestId/proposal/:proposalId/accept', verifyToken, verifyEmailVerified, async (req, res) => {
+  try {
+    const request = await CustomizeEventRequest.findOne({
+      _id: req.params.requestId,
+      userId: req.user._id
+    });
+
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    if (request.status !== 'show-partners-members') {
+      return res.status(400).json({ message: 'This request is not open for proposal acceptance' });
+    }
+
+    const proposal = request.proposals.id(req.params.proposalId);
+
+    if (!proposal) {
+      return res.status(404).json({ message: 'Proposal not found' });
+    }
+
+    // Update proposal statuses
+    let acceptedPartnerDetails = null;
+    const emailPromises = [];
+
+    request.proposals.forEach(p => {
+      if (p._id.toString() === req.params.proposalId) {
+        p.status = 'accepted';
+        acceptedPartnerDetails = {
+          partnerId: p.partnerId,
+          partnerName: p.partnerName,
+          partnerEmail: p.partnerEmail,
+          partnerContactNumber: p.partnerContactNumber
+        };
+
+        // Send acceptance email to this partner/member
+        emailPromises.push(
+          sendEventProposalAcceptedNotification(
+            p.partnerEmail,
+            p.partnerName,
+            {
+              eventType: request.eventType,
+              eventTypeOther: request.eventTypeOther,
+              numberOfGuests: request.numberOfGuests,
+              estimatedBudget: request.estimatedBudget,
+              activities: request.activities,
+              specialRequests: request.specialRequests
+            },
+            {
+              fullName: request.fullName,
+              email: request.email,
+              contactNumber: request.contactNumber
+            }
+          )
+        );
+      } else if (p.status === 'pending') {
+        p.status = 'rejected';
+
+        // Send rejection email to other partners/members
+        emailPromises.push(
+          sendEventProposalRejectedNotification(
+            p.partnerEmail,
+            p.partnerName,
+            {
+              eventType: request.eventType,
+              eventTypeOther: request.eventTypeOther,
+              numberOfGuests: request.numberOfGuests
+            }
+          )
+        );
+      }
+    });
+
+    // Update request status and accepted proposal info
+    request.status = 'proposal-accepted';
+    request.acceptedProposalId = req.params.proposalId;
+    request.acceptedAt = new Date();
+
+    // Update admin note with accepted partner/member details
+    const timestamp = new Date().toLocaleString('en-US', {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    const acceptanceNote = `\n\n--- PROPOSAL ACCEPTED ---\nAccepted Partner/Member: ${acceptedPartnerDetails.partnerName}\nEmail: ${acceptedPartnerDetails.partnerEmail}\nContact Number: ${acceptedPartnerDetails.partnerContactNumber}\nAccepted At: ${timestamp}`;
+
+    request.adminNote = (request.adminNote || '') + acceptanceNote;
+
+    await request.save();
+
+    // Send all emails
+    await Promise.allSettled(emailPromises);
+
+    res.json({
+      success: true,
+      message: 'Proposal accepted successfully. Notifications sent to all parties.',
+      data: request
+    });
+
+  } catch (error) {
+    console.error('Accept proposal error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

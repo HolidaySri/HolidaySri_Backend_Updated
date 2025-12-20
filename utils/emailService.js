@@ -3443,6 +3443,214 @@ const sendProposalRejectedNotification = async (email, name, requestDetails) => 
   }
 };
 
+// Send event proposal received notification to client
+const sendEventProposalReceivedNotification = async (email, name, requestDetails, partnerName) => {
+  const transporter = createTransporter();
+
+  const mailOptions = {
+    from: {
+      name: 'Holidaysri.com',
+      address: process.env.EMAIL_USER
+    },
+    to: email,
+    subject: '📬 New Proposal Received for Your Event Request',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background: linear-gradient(135deg, #9333ea 0%, #a855f7 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">📬 New Proposal Received!</h1>
+        </div>
+
+        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${name},
+          </p>
+
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Great news! <strong>${partnerName}</strong> has submitted a proposal for your event request.
+          </p>
+
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #9333ea; margin-top: 0;">Event Details:</h3>
+            <p style="margin: 5px 0;"><strong>Event Type:</strong> ${requestDetails.eventType === 'other' ? requestDetails.eventTypeOther : requestDetails.eventType}</p>
+            <p style="margin: 5px 0;"><strong>Number of Guests:</strong> ${requestDetails.numberOfGuests}</p>
+            <p style="margin: 5px 0;"><strong>Budget:</strong> ${requestDetails.estimatedBudget}</p>
+          </div>
+
+          <div style="background-color: #fef3c7; padding: 15px; border-left: 4px solid #f59e0b; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; color: #92400e;">
+              <strong>📋 Next Steps:</strong><br>
+              Log in to your account to view the proposal and accept it if it meets your requirements.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://www.holidaysri.com/customize-event"
+               style="display: inline-block; background: linear-gradient(135deg, #9333ea 0%, #a855f7 100%); color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+              View Proposal
+            </a>
+          </div>
+
+          <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center;">
+            <p style="color: #888; font-size: 14px; margin: 0;">
+              © 2024 Holidaysri.com. All rights reserved.
+            </p>
+            <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
+              This is an automated message, please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Event proposal received notification email sending error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send event proposal accepted notification to partner/member
+const sendEventProposalAcceptedNotification = async (email, name, requestDetails, clientDetails) => {
+  const transporter = createTransporter();
+
+  const mailOptions = {
+    from: {
+      name: 'Holidaysri.com',
+      address: process.env.EMAIL_USER
+    },
+    to: email,
+    subject: '🎉 Congratulations! Your Event Proposal Has Been Accepted',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Proposal Accepted!</h1>
+        </div>
+
+        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${name},
+          </p>
+
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Congratulations! Your proposal has been accepted by the client. Here are the client's contact details:
+          </p>
+
+          <div style="background-color: #d1fae5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+            <h3 style="color: #065f46; margin-top: 0;">Client Contact Information:</h3>
+            <p style="margin: 5px 0;"><strong>Name:</strong> ${clientDetails.fullName}</p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> <a href="mailto:${clientDetails.email}" style="color: #10b981;">${clientDetails.email}</a></p>
+            <p style="margin: 5px 0;"><strong>Contact Number:</strong> <a href="tel:${clientDetails.contactNumber}" style="color: #10b981;">${clientDetails.contactNumber}</a></p>
+          </div>
+
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #9333ea; margin-top: 0;">Event Details:</h3>
+            <p style="margin: 5px 0;"><strong>Event Type:</strong> ${requestDetails.eventType === 'other' ? requestDetails.eventTypeOther : requestDetails.eventType}</p>
+            <p style="margin: 5px 0;"><strong>Number of Guests:</strong> ${requestDetails.numberOfGuests}</p>
+            <p style="margin: 5px 0;"><strong>Budget:</strong> ${requestDetails.estimatedBudget}</p>
+            ${requestDetails.activities && requestDetails.activities.length > 0 ? `<p style="margin: 5px 0;"><strong>Activities:</strong> ${requestDetails.activities.join(', ')}</p>` : ''}
+            ${requestDetails.specialRequests ? `<p style="margin: 5px 0;"><strong>Special Requests:</strong> ${requestDetails.specialRequests}</p>` : ''}
+          </div>
+
+          <div style="background-color: #fef3c7; padding: 15px; border-left: 4px solid #f59e0b; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; color: #92400e;">
+              <strong>📞 Next Steps:</strong><br>
+              Please contact the client directly to discuss the event details and finalize the arrangements.
+            </p>
+          </div>
+
+          <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center;">
+            <p style="color: #888; font-size: 14px; margin: 0;">
+              © 2024 Holidaysri.com. All rights reserved.
+            </p>
+            <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
+              This is an automated message, please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Event proposal accepted notification email sending error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send event proposal rejected notification to partner/member
+const sendEventProposalRejectedNotification = async (email, name, requestDetails) => {
+  const transporter = createTransporter();
+
+  const mailOptions = {
+    from: {
+      name: 'Holidaysri.com',
+      address: process.env.EMAIL_USER
+    },
+    to: email,
+    subject: 'Event Proposal Update - Holidaysri.com',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Proposal Update</h1>
+        </div>
+
+        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${name},
+          </p>
+
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Thank you for submitting your proposal for the event request. Unfortunately, the client has chosen to proceed with another partner/member.
+          </p>
+
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #9333ea; margin-top: 0;">Event Details:</h3>
+            <p style="margin: 5px 0;"><strong>Event Type:</strong> ${requestDetails.eventType === 'other' ? requestDetails.eventTypeOther : requestDetails.eventType}</p>
+            <p style="margin: 5px 0;"><strong>Number of Guests:</strong> ${requestDetails.numberOfGuests}</p>
+          </div>
+
+          <div style="background-color: #dbeafe; padding: 15px; border-left: 4px solid #3b82f6; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; color: #1e40af;">
+              <strong>💡 Keep Going!</strong><br>
+              Don't be discouraged! There are many more opportunities available. Continue browsing open requests to find your next project.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://www.holidaysri.com/customize-event"
+               style="display: inline-block; background: linear-gradient(135deg, #9333ea 0%, #a855f7 100%); color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+              View More Requests
+            </a>
+          </div>
+
+          <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center;">
+            <p style="color: #888; font-size: 14px; margin: 0;">
+              © 2024 Holidaysri.com. All rights reserved.
+            </p>
+            <p style="color: #888; font-size: 12px; margin: 5px 0 0 0;">
+              This is an automated message, please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Event proposal rejected notification email sending error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   generateOTP,
   sendEmailVerificationOTP,
@@ -3479,5 +3687,8 @@ module.exports = {
   sendVerificationRejectionNotification,
   sendProposalReceivedNotification,
   sendProposalAcceptedNotification,
-  sendProposalRejectedNotification
+  sendProposalRejectedNotification,
+  sendEventProposalReceivedNotification,
+  sendEventProposalAcceptedNotification,
+  sendEventProposalRejectedNotification
 };

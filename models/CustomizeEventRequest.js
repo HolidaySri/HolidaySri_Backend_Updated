@@ -62,7 +62,7 @@ const customizeEventRequestSchema = new mongoose.Schema({
   // Request Status
   status: {
     type: String,
-    enum: ['pending', 'under-review', 'approved', 'rejected', 'show-partners-members', 'open-acceptance'],
+    enum: ['pending', 'under-review', 'approved', 'rejected', 'show-partners-members', 'open-acceptance', 'proposal-accepted'],
     default: 'pending'
   },
   
@@ -96,7 +96,7 @@ const customizeEventRequestSchema = new mongoose.Schema({
     type: Date
   },
 
-  // Partner/Member Approval
+  // Partner/Member Approval (Legacy - kept for backward compatibility)
   partnerApprovedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -108,7 +108,55 @@ const customizeEventRequestSchema = new mongoose.Schema({
   partnerApprovedAt: {
     type: Date
   },
-  
+
+  // Proposals from Partners & Members
+  proposals: [{
+    partnerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    partnerName: {
+      type: String,
+      required: true
+    },
+    partnerEmail: {
+      type: String,
+      required: true
+    },
+    partnerContactNumber: {
+      type: String,
+      required: true
+    },
+    proposalPDF: {
+      url: {
+        type: String,
+        required: true
+      },
+      publicId: {
+        type: String,
+        required: true
+      }
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'accepted', 'rejected'],
+      default: 'pending'
+    },
+    submittedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+
+  // Accepted Proposal Information
+  acceptedProposalId: {
+    type: mongoose.Schema.Types.ObjectId
+  },
+  acceptedAt: {
+    type: Date
+  },
+
   // Timestamps
   submittedAt: {
     type: Date,
