@@ -372,12 +372,14 @@ router.patch('/:id/increment-click', async (req, res) => {
 // POST /api/home-banner-slot/notify-me - Register for slot availability notification
 router.post('/notify-me', verifyToken, async (req, res) => {
   try {
-    const { email } = req.body;
+    // Use the logged-in user's email from req.user
+    const email = req.user.email;
 
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required'
+        message: 'User email not found. Please login again.',
+        requiresLogin: true
       });
     }
 
